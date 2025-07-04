@@ -146,8 +146,8 @@ class sendDICOM:
     def run(self, ch, method, properties, body, executor):
         treatment_sites = {"Tom": "LUNG", "Tim": "KIDNEY"}
         ports = {
-            "LUNG": {"Title": "LUNG", "Port": 8104},
-            "KIDNEY": {"Title": "KIDNEY", "Port": 8104}
+            "LUNG": {"Title": "LUNG", "Port": 80},
+            "KIDNEY": {"Title": "KIDNEY", "Port": 80}
         }
         
         try:
