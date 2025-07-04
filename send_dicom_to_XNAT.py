@@ -76,8 +76,8 @@ class sendDICOM:
                     # Get the BodyPartExamined, PatientName, PatientID from the rtstruct, this will be used in upload_csv_to_xnat.
                     ds = pydicom.dcmread(file_path, stop_before_pixels=True)                   
                 
-                
-                assoc = ae.associate('digione-infrastructure-xnat-nginx-1', ae_title = Title)
+                requests.get("http://xnat-nginx")
+                assoc = ae.associate('http://xnat-nginx', port, ae_title = Title)
             
                 if ds.Modality == "RTSTRUCT":
                     self.patient_info = [ds.BodyPartExamined, ds.PatientName, ds.PatientID]
@@ -146,8 +146,8 @@ class sendDICOM:
     def run(self, ch, method, properties, body, executor):
         treatment_sites = {"Tom": "LUNG", "Tim": "KIDNEY"}
         ports = {
-            "LUNG": {"Title": "LUNG", "Port": 8104},
-            "KIDNEY": {"Title": "KIDNEY", "Port": 8104}
+            "LUNG": {"Title": "LUNG", "Port": 80},
+            "KIDNEY": {"Title": "KIDNEY", "Port": 80}
         }
         
         try:
