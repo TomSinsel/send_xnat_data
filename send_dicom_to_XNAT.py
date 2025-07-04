@@ -75,9 +75,8 @@ class sendDICOM:
                 else:
                     # Get the BodyPartExamined, PatientName, PatientID from the rtstruct, this will be used in upload_csv_to_xnat.
                     ds = pydicom.dcmread(file_path, stop_before_pixels=True)                   
-                
-                requests.get("http://xnat-nginx")
-                assoc = ae.associate('xnat-nginx', port, ae_title = Title)
+
+                assoc = ae.associate('xnat-web', port, ae_title = Title)
             
                 if ds.Modality == "RTSTRUCT":
                     self.patient_info = [ds.BodyPartExamined, ds.PatientName, ds.PatientID]
@@ -123,7 +122,8 @@ class sendDICOM:
                 logging.info("DICOM data is not yet archived, can not send csv")
                 time.sleep(5)    
                 
-            upload_url = f"{self.xnat_url}/data/projects/{project}/subjects/{subject}/experiments/{experiment}/resources/csv/files/{self.csv_radiomics}"
+            filename = os.path.basename(self.csv_radiomics)
+            upload_url = f"{self.xnat_url}/data/projects/{project}/subjects/{subject}/experiments/{experiment}/resources/csv/files/{filename}"
             logging.info(f"Dicom data archived for session {experiment}, uploading CSV.")
             
             # Upload the the csv files to XNAT
@@ -146,8 +146,8 @@ class sendDICOM:
     def run(self, ch, method, properties, body, executor):
         treatment_sites = {"Tom": "LUNG", "Tim": "KIDNEY"}
         ports = {
-            "LUNG": {"Title": "LUNG", "Port": 80},
-            "KIDNEY": {"Title": "KIDNEY", "Port": 80}
+            "LUNG": {"Title": "LUNG", "Port": 8104},
+            "KIDNEY": {"Title": "KIDNEY", "Port": 8104}
         }
         
         try:
