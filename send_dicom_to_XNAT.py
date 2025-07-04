@@ -22,7 +22,7 @@ which means that if the data received has the same patient name and the same pat
 
 class sendDICOM:
     def __init__(self):
-        self.xnat_url = "http://localhost:80"
+        self.xnat_url = "http://xnat-web:80"
         self.username = "admin"
         self.password = "admin"
         self.csv_radiomics = None
@@ -77,7 +77,7 @@ class sendDICOM:
                     ds = pydicom.dcmread(file_path, stop_before_pixels=True)                   
                 
                 
-                assoc = ae.associate('xnat-web-1', port, ae_title = Title)
+                assoc = ae.associate('xnat-web', port, ae_title = Title)
             
                 if ds.Modality == "RTSTRUCT":
                     self.patient_info = [ds.BodyPartExamined, ds.PatientName, ds.PatientID]
