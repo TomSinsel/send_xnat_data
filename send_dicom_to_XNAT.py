@@ -77,7 +77,7 @@ class sendDICOM:
                     ds = pydicom.dcmread(file_path, stop_before_pixels=True)                   
                 
                 
-                assoc = ae.associate('xnat-web', port, ae_title = Title)
+                assoc = ae.associate('digione-infrastructure-xnat-nginx-1', port, ae_title = Title)
             
                 if ds.Modality == "RTSTRUCT":
                     self.patient_info = [ds.BodyPartExamined, ds.PatientName, ds.PatientID]
