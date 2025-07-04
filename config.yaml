@@ -1,0 +1,7 @@
+xnat:
+  host: "rabbitmq"
+  localhost: "localhost"
+  port: "5672"
+  username: "guest"
+  password: "guest"
+  queue_name: "xnat"

@@ -1,0 +1,45 @@
+version: '3'
+services:
+  # RabbitMQ service
+  rabbitmq:
+    image: "rabbitmq:3-management"
+    container_name: "rabbitmq"
+    ports:
+      - "5672:5672"  # RabbitMQ port for communication
+      - "15672:15672"  # Management console web UI port
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    healthcheck:
+      test: ["CMD", "curl", "-f", http://localhost:15672"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app_network
+
+  # Anonymizer app service
+  send_xnat:
+    build:
+      context: .  # Current directory (where the Dockerfile is located)
+    container_name: "send_xnat"
+    environment:
+      - RABBITMQ_HOST=rabbitmq  # Service name of the RabbitMQ container
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USER=guest
+      - RABBITMQ_PASSWORD=guest
+    restart: on-failure
+    depends_on:
+      - rabbitmq
+    links: 
+      - rabbitmq
+    volumes:
+      - ./config.yaml:/app/config.yaml  # Mount config.yaml into the container
+      # - ./anonimised_data:/app/anonimised_data
+
+    networks:
+      - app_network
+
+networks:
+  app_network:
+    driver: bridge
