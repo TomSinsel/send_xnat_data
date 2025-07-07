@@ -22,7 +22,7 @@ which means that if the data received has the same patient name and the same pat
 
 class sendDICOM:
     def __init__(self):
-        self.xnat_url = "http://digione-infrastructure-xnat-nginx-1:80"
+        self.xnat_url = "http://localhost:80"
         self.username = "admin"
         self.password = "admin"
         self.csv_radiomics = None
@@ -57,7 +57,6 @@ class sendDICOM:
         try: 
             ae = AE()
             ae.requested_contexts = StoragePresentationContexts
-            self.patient_info = []
                 
             first_iteration = True
             
@@ -83,7 +82,7 @@ class sendDICOM:
                     # Get the BodyPartExamined, PatientName, PatientID from the rtstruct, this will be used in upload_csv_to_xnat.
                     ds = pydicom.dcmread(file_path, stop_before_pixels=True)                   
 
-                assoc = ae.associate('xnat-nginx', port, ae_title = Title)
+                assoc = ae.associate('localhost', port, ae_title = Title)
             
                 if ds.Modality == "RTSTRUCT":
                     self.patient_info = [ds.BodyPartExamined, ds.PatientName, ds.PatientID]
@@ -100,8 +99,54 @@ class sendDICOM:
         
         except Exception as e:
             logging.error(f"An error occurred sending dicom files to XNAT: {e}", exc_info=True)
-    
-    
+
+    def dicom_to_xnat_post(self, ports, data_folder):
+        first_iteration = True
+        
+        xnat_url = "http://digione-infrastructure-xnat-nginx-1:80"
+         
+        auth = HTTPBasicAuth(self.username, self.password)
+         
+        for file in os.listdir(data_folder):
+            
+            file_path = os.path.join(data_folder, file)
+            
+            # Get the radiomics csv file from the folder which will be used in upload_csv_to_xnat to upload it
+            if file.endswith(".csv"):
+                self.csv_radiomics = file_path
+                logging.info(f"radiomics file found: {file}")    
+                continue
+        
+            if first_iteration:
+                ds = dcmread(os.path.join(data_folder, os.listdir(data_folder)[0]))
+                treatment_site = ds.BodyPartExamined
+                
+                port = ports[treatment_site]["Port"]
+                Title = ports[treatment_site]["Title"]
+                
+                first_iteration = False 
+            else:
+                # Get the BodyPartExamined, PatientName, PatientID from the rtstruct, this will be used in upload_csv_to_xnat.
+                ds = pydicom.dcmread(file_path, stop_before_pixels=True)                   
+        
+            if ds.Modality == "RTSTRUCT":
+                self.patient_info = [ds.BodyPartExamined, ds.PatientName, ds.PatientID]
+            
+            
+            upload_url = f"{xnat_url}/data/services/import?inbody=true&project={Title}"
+            
+            with open(file_path, "rb") as f:
+                response = requests.post(
+                    upload_url,
+                    data=f,
+                    headers={"Content-Type": "application/dicom"},
+                    auth=auth
+                )
+            
+            logging.info(f"Status projects: {response.status_code}")
+            
+        logging.info("All dicom files send to XNAT")
+  
     def is_session_ready(self, url):
         """Checks if the url is ready"""
         response = requests.get(url, auth=HTTPBasicAuth(self.username, self.password))
@@ -163,8 +208,8 @@ class sendDICOM:
 
             self.adding_treatment_site(treatment_sites, data_folder)
             self.checking_connectivity()
-            self.dicom_to_XNAT(ports, data_folder)
-            self.upload_csv_to_xnat(data_folder)
+            self.dicom_to_xnat_post(ports, data_folder)
+            # self.upload_csv_to_xnat(data_folder)
             logging.info(f"Send data from: {data_folder}")
 
         except Exception as e:
@@ -181,7 +226,8 @@ if __name__ == "__main__":
     
     # xnat_pipeline = sendDICOM()
     # xnat_pipeline.adding_treatment_site(treatment_sites, data_folder)
-    # xnat_pipeline.dicom_to_XNAT(ports, data_folder)
+    # # xnat_pipeline.dicom_to_XNAT(ports, data_folder)
+    # xnat_pipeline.dicom_to_xnat_post(ports, data_folder)
     # xnat_pipeline.upload_csv_to_xnat(data_folder)
     
     rabbitMQ_config = Config("xnat")
