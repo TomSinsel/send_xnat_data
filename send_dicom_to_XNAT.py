@@ -48,7 +48,8 @@ class sendDICOM:
     
     def checking_connectivity(self):
         logging.info("Checking connectivity")
-        x = requests.get("http://xnat-web:8104")
+        basic = HTTPBasicAuth(self.username, self.password)
+        x = requests.get("http://xnat-web:8104", basic)
         logging.info(x.status_code)
     
     def dicom_to_XNAT(self, ports, data_folder):
