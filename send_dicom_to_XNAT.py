@@ -44,7 +44,13 @@ class sendDICOM:
             logging.info("added the treatment site")
         except Exception as e:
             logging.error(f"An error occurred adding the fake treatment site: {e}", exc_info=True)
-            
+    
+    
+    def checking_connectivity(self):
+        logging.info("Checking connectivity")
+        x = requests.get("http://xnat-web:8104")
+        logging.info(x.status_code)
+    
     def dicom_to_XNAT(self, ports, data_folder):
         """Send dicom data to the XNAT server"""
         try: 
@@ -155,6 +161,7 @@ class sendDICOM:
             data_folder = message_data.get('folder_path')
 
             self.adding_treatment_site(treatment_sites, data_folder)
+            self.checking_connectivity()
             self.dicom_to_XNAT(ports, data_folder)
             self.upload_csv_to_xnat(data_folder)
             logging.info(f"Send data from: {data_folder}")
