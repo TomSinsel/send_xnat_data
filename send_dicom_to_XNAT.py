@@ -49,7 +49,7 @@ class sendDICOM:
     def checking_connectivity(self):
         logging.info("Checking connectivity")
         basic = HTTPBasicAuth(self.username, self.password)
-        x = requests.get("http://digione-infrastructure-xnat-nginx-1:80", basic)
+        x = requests.get("http://digione-infrastructure-xnat-nginx-1:80", auth=basic)
         logging.info(x.status_code)
     
     def dicom_to_XNAT(self, ports, data_folder):
