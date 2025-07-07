@@ -22,7 +22,7 @@ which means that if the data received has the same patient name and the same pat
 
 class sendDICOM:
     def __init__(self):
-        self.xnat_url = "http://xnat-web:80"
+        self.xnat_url = "http://digione-infrastructure-xnat-nginx-1:80"
         self.username = "admin"
         self.password = "admin"
         self.csv_radiomics = None
@@ -49,7 +49,7 @@ class sendDICOM:
     def checking_connectivity(self):
         logging.info("Checking connectivity")
         basic = HTTPBasicAuth(self.username, self.password)
-        x = requests.get("http://xnat-web:8104", basic)
+        x = requests.get("http://digione-infrastructure-xnat-nginx-1:80", basic)
         logging.info(x.status_code)
     
     def dicom_to_XNAT(self, ports, data_folder):
