@@ -18,7 +18,7 @@ This means if you upload data with the same patient name and ID multiple times, 
 Important Things to Know
 Check your XNAT URL!
 By default, this pipeline uses: http://digione-infrastructure-xnat-nginx-1:80
-If your XNAT server lives somewhere else, you must change this, or your uploads will fail—or worse, go to the wrong place.
+If your XNAT server lives somewhere else, you must change this, or your uploads will fail.
 
 Running the Pipeline
 The class can run on its own or as part of a RabbitMQ message consumer. For standalone use, the commented part below: if __name__ == "__main__"

@@ -94,7 +94,6 @@ class SendDICOM:
                 auth=self.auth
             )
         
-        logging.info(f"Status projects: {response.status_code}")
         os.remove(zip_path)
         logging.info("All dicom files send to XNAT")
   
