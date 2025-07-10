@@ -128,7 +128,7 @@ class SendDICOM:
 
             # Check if the dicom files have been archived, only then the CSV files can be send
             while not self.is_session_ready(check_url):
-                logging.info("DICOM data is not yet archived, can not send csv")
+                logging.info("DICOM data is not yet archived, can not send radiomics CSV yet...")
                 time.sleep(5)    
                 
             filename = os.path.basename(self.csv_radiomics)
@@ -169,11 +169,12 @@ class SendDICOM:
             if connectivity != 200:
                 raise SystemExit(f"Connectivity check failed with status code {connectivity}.")
             else:
-                logging.info("Connection to XNAT is established")         
+                logging.info("Connecting to XNAT works")         
             
             self.dicom_to_xnat(ports, data_folder)
             self.upload_csv_to_xnat(data_folder)
             logging.info(f"Send data from: {data_folder}")
+            ch.basic_ack(delivery_tag=method.delivery_tag)
 
         except Exception as e:
             logging.error(f"An error occurred in the run method: {e}", exc_info=True)
