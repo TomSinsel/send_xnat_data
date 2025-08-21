@@ -9,6 +9,8 @@ from consumer import Consumer
 from config_handler import Config
 import json
 import zipfile
+from RabbitMQ_messenger import messenger
+
 
 logging.basicConfig(
     level=logging.INFO,
@@ -118,7 +120,7 @@ class SendDICOM:
                 
             # If no CSV was found in the loop stop the whole method
             if not self.csv_radiomics:
-                logging.info("No CSV file found")
+                logging.info("No radiomics CSV file found")
                 return
         
         try:                    
@@ -150,6 +152,11 @@ class SendDICOM:
                         
         except Exception as e:
             logging.error(f"An error occurred sending CSV files to XNAT: {e}", exc_info=True)
+            
+    def send_next_queue(self, queue, data_folder):
+        message_creator = messenger()
+        message_creator.create_message_next_queue(queue, data_folder)
+    
     
     def run(self, ch, method, properties, body, executor):
         treatment_sites = {"Tom": "LUNG", "Tim": "KIDNEY"}
@@ -175,11 +182,14 @@ class SendDICOM:
             
             self.dicom_to_xnat(ports, data_folder)
             self.upload_csv_to_xnat(data_folder)
-            logging.info(f"Send data from: {data_folder}")
-
-
+            logging.info(f"Send data from: {data_folder} to XNAT")
+            
         except Exception as e:
             logging.error(f"An error occurred in the run method: {e}", exc_info=True)
+
+        # Send a message to the next queue.
+        if Config("xnat")["send_queue"] != None:
+            self.send_next_queue(Config("xnat")["send_queue"], data_folder)
         
 if __name__ == "__main__":
     # treatment_sites = {"Tom": "LUNG", "Tim": "KIDNEY"}
