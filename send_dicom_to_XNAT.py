@@ -158,10 +158,13 @@ class SendDICOM:
             "KIDNEY": {"project": "KIDNEY", "Port": 80}
         }
         
-        try:
-            message_data = json.loads(body.decode("utf-8"))
-            data_folder = message_data.get('folder_path')
+        ch.basic_ack(delivery_tag=method.delivery_tag)
+        
 
+        message_data = json.loads(body.decode("utf-8"))
+        data_folder = message_data.get('folder_path')
+        
+        try:
             self.adding_treatment_site(treatment_sites, data_folder)
             
             connectivity = self.checking_connectivity()     
@@ -173,7 +176,7 @@ class SendDICOM:
             self.dicom_to_xnat(ports, data_folder)
             self.upload_csv_to_xnat(data_folder)
             logging.info(f"Send data from: {data_folder}")
-            ch.basic_ack(delivery_tag=method.delivery_tag)
+
 
         except Exception as e:
             logging.error(f"An error occurred in the run method: {e}", exc_info=True)
