@@ -11,7 +11,6 @@ import json
 import zipfile
 from RabbitMQ_messenger import messenger
 
-
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s",
@@ -28,8 +27,31 @@ class SendDICOM:
         username = "admin"
         password = "admin"
         self.auth = HTTPBasicAuth(username, password)
-        self.csv_radiomics = None
-              
+
+    def checking_connectivity(self):
+        """Ckecks the connection to xnat"""
+        logging.info("Checking connectivity")
+        connectivity = requests.get(self.xnat_url, auth=self.auth)
+        logging.info(connectivity.status_code)
+        return connectivity.status_code
+    
+    def is_session_ready(self, url):
+        """Checks if the project url is ready"""
+        response = requests.get(url, auth=self.auth)
+        return response.status_code == 200
+
+    def check_data_types(self, data_folder):
+        """Check what type of files a are in the folder"""
+        file_types = set()
+
+        for file in os.listdir(data_folder):
+            if os.path.isfile(os.path.join(data_folder, file)):
+                _, ext = os.path.splitext(file)
+                if ext:
+                    file_types.add(ext.lower())
+
+        return sorted(file_types)
+        
     def adding_treatment_site(self, treatment_sites, data_folder):
         """Hardcode the treatment sides where we want filter on in the XNAT projects"""
         try:
@@ -47,14 +69,9 @@ class SendDICOM:
             logging.info("Added the treatment site")
         except Exception as e:
             logging.error(f"An error occurred adding the fake treatment site: {e}", exc_info=True)
-     
-    def checking_connectivity(self):
-        logging.info("Checking connectivity")
-        connectivity = requests.get(self.xnat_url, auth=self.auth)
-        logging.info(connectivity.status_code)
-        return connectivity.status_code
     
     def dicom_to_xnat(self, ports, data_folder):
+        """Send the DICOM in a folder to XNAT"""
         first_iteration = True
         files = os.listdir(data_folder)
         os.makedirs("zip_folder", exist_ok=True)
@@ -65,66 +82,67 @@ class SendDICOM:
                 file_path = os.path.join(data_folder, file)
                 
                 # Get the radiomics csv file from the folder which will be used in upload_csv_to_xnat to upload it
-                if file.endswith(".csv"):
-                    self.csv_radiomics = file_path
-                    logging.info(f"radiomics file found: {file}")    
-                    continue
-                elif file.lower().endswith('.dcm'):
+                if file.lower().endswith('.dcm'):
                     # add file to zip with just filename (no folder)
                     zipf.write(file_path, arcname=file)
+                else:
+                    continue
             
                 if first_iteration:
                     ds = dcmread(os.path.join(data_folder, files[0]))
                     treatment_site = ds.BodyPartExamined
         
                     project = ports[treatment_site]["project"]    
-                    first_iteration = False
-                    
+                    first_iteration = False  
                 else:
                     ds = pydicom.dcmread(file_path, stop_before_pixels=True)                   
-            
-                if ds.Modality == "RTSTRUCT":
-                    # Get the BodyPartExamined, PatientName, PatientID from the rtstruct, this will be used in upload_csv_to_xnat.
-                    self.patient_info = [ds.BodyPartExamined, ds.PatientName, ds.PatientID]
-                
+                            
         upload_url = f"{self.xnat_url}/data/services/import?PROJECT_ID={project}&overwrite=append&prearchive=true&inbody=true"            
         with open(zip_path, "rb") as f:
-            response = requests.post(
+            response =requests.post(
                 upload_url,
                 data=f,
                 headers={"Content-Type": "application/zip"},
                 auth=self.auth
             )
+            
+            if response.status_code not in (200,201):
+                logging.error(f"Upload failed: {response.status_code} {response.text}")
+            else: 
+                logging.info("All dicom files send to XNAT")
         
         os.remove(zip_path)
-        logging.info("All dicom files send to XNAT")
-  
-    def is_session_ready(self, url):
-        """Checks if the url is ready"""
-        response = requests.get(url, auth=self.auth)
-        return response.status_code == 200
-       
+    
+    def get_JSON_metadata(self, JSON_path):
+        """Open the json metadata to be able to send the radiomics csv to the correct project"""
+        with open(JSON_path, "r") as f:
+            info_dict = json.load(f)
+    
+        patient_info = [
+            info_dict["BodyPartExamined"],
+            info_dict["PatientName"],
+            info_dict["PatientID"]
+        ]
+             
+        return patient_info  
+    
     def upload_csv_to_xnat(self, data_folder):
         """send the radiomics csv to the correct project after the patient dicom data has been send."""
         
-        # Get the radiomics csv file from the folder if dicom_to_XNAT method has not been used yet
-        if not self.csv_radiomics:
-            files = os.listdir(data_folder)
-            for file in files:
+        files = os.listdir(data_folder)
+        
+        for file in files:
+            if file.endswith(".csv"):
                 file_path = os.path.join(data_folder, file)
-                
-                if file.endswith(".csv"):
-                    self.csv_radiomics = file_path
-                    logging.info(f"radiomics file found: {file}")    
-                    break
-                
-            # If no CSV was found in the loop stop the whole method
-            if not self.csv_radiomics:
-                logging.info("No radiomics CSV file found")
-                return
+                csv_radiomics = file_path
+                logging.info(f"radiomics file found: {file}")
+            elif file.endswith(".json"):
+                file_path = os.path.join(data_folder, file)
+                json_metadata = self.get_JSON_metadata(file_path)
+                logging.info(f"Metata file found: {file}")
         
         try:                    
-            project, subject, experiment = self.patient_info
+            project, subject, experiment = json_metadata
             check_url = f"{self.xnat_url}/data/projects/{project}/subjects/{subject}/experiments/{experiment}"
 
             # Check if the dicom files have been archived, only then the CSV files can be send
@@ -132,12 +150,12 @@ class SendDICOM:
                 logging.info("DICOM data is not yet archived, can not send radiomics CSV yet...")
                 time.sleep(5)    
                 
-            filename = os.path.basename(self.csv_radiomics)
-            upload_url = f"{self.xnat_url}/data/projects/{project}/subjects/{subject}/experiments/{experiment}/resources/csv/files/{filename}"
+            filename = os.path.basename(csv_radiomics)
+            upload_url = f"{check_url}/resources/csv/files/{filename}"
             logging.info(f"Dicom data archived for session {experiment}, uploading CSV.")
             
             # Upload the the csv files to XNAT
-            with open(self.csv_radiomics, 'rb') as f:
+            with open(csv_radiomics, 'rb') as f:
                 response = requests.put(
                     upload_url,
                     data=f,
@@ -146,9 +164,9 @@ class SendDICOM:
                 )
                 
                 if response.status_code in [200, 201]:
-                    logging.info(f"Uploaded {self.csv_radiomics} successfully.")
+                    logging.info(f"Uploaded {csv_radiomics} successfully.")
                 else:
-                    logging.info(f"Failed to upload {self.csv_radiomics}. Status: {response.status_code}, Error: {response.text}")
+                    logging.info(f"Failed to upload {csv_radiomics}. Status: {response.status_code}, Error: {response.text}")
                         
         except Exception as e:
             logging.error(f"An error occurred sending CSV files to XNAT: {e}", exc_info=True)
@@ -167,22 +185,27 @@ class SendDICOM:
         
         ch.basic_ack(delivery_tag=method.delivery_tag)
         
+        # Check if connection to xnat works
+        connection = self.checking_connectivity()
+        while connection != 200:
+            logging.info(f"Connectivition check failed with status code: {connection}.")
+            time.sleep(10)
+            connection = self.checking_connectivity()
 
+        logging.info("Connecting to XNAT works")         
+        
         message_data = json.loads(body.decode("utf-8"))
         data_folder = message_data.get('folder_path')
         
         try:
-            self.adding_treatment_site(treatment_sites, data_folder)
-            
-            connectivity = self.checking_connectivity()     
-            if connectivity != 200:
-                raise SystemExit(f"Connectivity check failed with status code {connectivity}.")
-            else:
-                logging.info("Connecting to XNAT works")         
-            
-            self.dicom_to_xnat(ports, data_folder)
-            self.upload_csv_to_xnat(data_folder)
-            logging.info(f"Send data from: {data_folder} to XNAT")
+            data_types = self.check_data_types(data_folder)
+            if ".dcm" in data_types:
+                self.adding_treatment_site(treatment_sites, data_folder)        
+                self.dicom_to_xnat(ports, data_folder)
+                logging.info(f"Send dicom file from: {data_folder} to XNAT")
+            elif ".csv" in data_types:
+                self.upload_csv_to_xnat(data_folder)
+                logging.info(f"Send csv file from: {data_folder} to XNAT")
             
         except Exception as e:
             logging.error(f"An error occurred in the run method: {e}", exc_info=True)
