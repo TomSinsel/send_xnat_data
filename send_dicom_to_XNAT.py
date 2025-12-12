@@ -181,7 +181,7 @@ class SendDICOM:
                 mime_type = "text/csv"
             else:  # JSON data
                 upload_url = f"{check_url}/resources/json/files/{filename}"
-                mime_type = "application/json"
+                mime_type = "text/json"
 
             logging.info(f"Uploading {data_file} to XNAT resource")
 
