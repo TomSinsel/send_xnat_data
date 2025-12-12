@@ -187,7 +187,7 @@ class SendDICOM:
 
             # Perform upload
             with open(data_file, "rb") as f:
-                response = requests.put(
+                response = requests.post(
                     upload_url,
                     data=f,
                     auth=self.auth,
@@ -237,7 +237,7 @@ class SendDICOM:
                 logging.info(f"Send dicom file from: {data_folder} to XNAT")
             elif ".csv" in data_types or ".json" in data_types:
                 self.upload_non_dcm_to_xnat(data_folder)
-                logging.info(f"Send csv file from: {data_folder} to XNAT")
+                logging.info(f"Send non dcm file from: {data_folder} to XNAT")
             
         except Exception as e:
             logging.error(f"An error occurred in the run method: {e}", exc_info=True)
