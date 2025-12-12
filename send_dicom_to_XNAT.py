@@ -23,7 +23,7 @@ which means that if the data received has the same patient name and the same pat
 
 class SendDICOM:
     def __init__(self):
-        self.xnat_url = "http://localhost:80"
+        self.xnat_url = "http://xnat-nginx:80"
         username = "admin"
         password = "admin"
         self.auth = HTTPBasicAuth(username, password)
@@ -247,21 +247,21 @@ class SendDICOM:
             self.send_next_queue(Config("xnat")["send_queue"], data_folder)
         
 if __name__ == "__main__":
-    treatment_sites = {"PYTIM05": "LUNG", "Tim": "KIDNEY"}
-    ports = {
-            "LUNG": {"project": "LUNG", "Port": 8104},
-            "KIDNEY": {"project": "KIDNEY", "Port": 8104}
-    }
+    # treatment_sites = {"PYTIM05": "LUNG", "Tim": "KIDNEY"}
+    # ports = {
+    #         "LUNG": {"project": "LUNG", "Port": 8104},
+    #         "KIDNEY": {"project": "KIDNEY", "Port": 8104}
+    # }
     
-    data_folder = "DICOM_data"
+    # data_folder = "DICOM_data"
     
-    xnat_pipeline = SendDICOM()
-    xnat_pipeline.adding_treatment_site(treatment_sites, data_folder)
-    xnat_pipeline.dicom_to_xnat(ports, data_folder)
+    # xnat_pipeline = SendDICOM()
+    # xnat_pipeline.adding_treatment_site(treatment_sites, data_folder)
+    # xnat_pipeline.dicom_to_xnat(ports, data_folder)
 
     
-    # rabbitMQ_config = Config("xnat")
-    # cons = Consumer(rmq_config=rabbitMQ_config)
-    # cons.open_connection_rmq()
-    # engine = SendDICOM()
-    # cons.start_consumer(callback=engine.run)
+    rabbitMQ_config = Config("xnat")
+    cons = Consumer(rmq_config=rabbitMQ_config)
+    cons.open_connection_rmq()
+    engine = SendDICOM()
+    cons.start_consumer(callback=engine.run)
