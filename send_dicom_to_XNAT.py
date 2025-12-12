@@ -175,25 +175,31 @@ class SendDICOM:
                 time.sleep(5)
 
             filename = os.path.basename(data_file)
+            upload_url = f"{check_url}/resources/json/files/{filename}"
 
             if data_type == "csv":
-                upload_url = f"{check_url}/resources/csv/files/{filename}"
                 mime_type = "text/csv"
+                
+                with open(data_file, "rb") as f:
+                    response = requests.put(
+                        upload_url,
+                        data=f,
+                        auth=self.auth,
+                        headers={'Content-Type': mime_type}
+                    )                
+
             else:  # JSON data
-                upload_url = f"{check_url}/resources/json/files/{filename}"
-                mime_type = "text/json"
+                mime_type = "application/json"
+                
+                with open(data_file, "rb") as fp:
+                    response = requests.put(
+                        upload_url,
+                        auth=self.auth,
+                        files={"file": (filename, fp, mime_type)}
+                    )                
 
             logging.info(f"Uploading {data_file} to XNAT resource")
-
-            # Perform upload
-            with open(data_file, "rb") as f:
-                response = requests.post(
-                    upload_url,
-                    data=f,
-                    auth=self.auth,
-                    headers={'Content-Type': mime_type}
-                )
-
+            
             if response.status_code in [200, 201]:
                 logging.info(f"Uploaded {data_file} successfully.")
             else:
