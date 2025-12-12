@@ -23,7 +23,7 @@ which means that if the data received has the same patient name and the same pat
 
 class SendDICOM:
     def __init__(self):
-        self.xnat_url = "http://localhost:80"
+        self.xnat_url = "http://xnat-nginx:80"
         username = "admin"
         password = "admin"
         self.auth = HTTPBasicAuth(username, password)
