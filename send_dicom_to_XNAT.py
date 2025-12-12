@@ -126,50 +126,82 @@ class SendDICOM:
              
         return patient_info  
     
-    def upload_csv_to_xnat(self, data_folder):
-        """send the radiomics csv to the correct project after the patient dicom data has been send."""
-        
-        files = os.listdir(data_folder)
-        
-        for file in files:
+    def upload_non_dcm_to_xnat(self, data_folder):
+        """Upload non-DICOM files (CSV or JSON) to the correct XNAT session."""
+
+        metadata_json = None
+        data_file = None
+        data_type = None   # "csv" or "json"
+
+        for file in os.listdir(data_folder):
+            file_path = os.path.join(data_folder, file)
+
+            # CSV files → always data files
             if file.endswith(".csv"):
-                file_path = os.path.join(data_folder, file)
-                csv_radiomics = file_path
-                logging.info(f"radiomics file found: {file}")
-            elif file.endswith(".json"):
-                file_path = os.path.join(data_folder, file)
-                json_metadata = self.get_JSON_metadata(file_path)
-                logging.info(f"Metata file found: {file}")
-        
-        try:                    
-            project, subject, experiment = json_metadata
+                data_file = file_path
+                data_type = "csv"
+                logging.info(f"Data file found: {file}")
+                continue
+
+            # JSON files → check if metadata or data
+            if file.endswith(".json"):
+                with open(file_path, "r") as f:
+                    data = json.load(f)
+
+                # JSON METADATA has 3 items
+                if isinstance(data, dict) and len(data) == 3:
+                    metadata_json = self.get_JSON_metadata(file_path)
+                    logging.info(f"Metadata file found: {file}")
+                else:
+                    data_file = file_path
+                    data_type = "json"
+                    logging.info(f"JSON data file found: {file}")
+
+        # Validate inputs
+        if metadata_json is None:
+            raise ValueError("Metadata JSON (3-key file) not found in folder.")
+
+        if data_file is None:
+            raise ValueError("Data file (CSV or JSON) not found in folder.")
+
+        try:
+            # Unpack JSON metadata
+            project, subject, experiment = metadata_json
             check_url = f"{self.xnat_url}/data/projects/{project}/subjects/{subject}/experiments/{experiment}"
 
-            # Check if the dicom files have been archived, only then the CSV files can be send
+            # Wait for DICOM archival
             while not self.is_session_ready(check_url):
-                logging.info("DICOM data is not yet archived, can not send radiomics CSV yet...")
-                time.sleep(5)    
-                
-            filename = os.path.basename(csv_radiomics)
-            upload_url = f"{check_url}/resources/csv/files/{filename}"
-            logging.info(f"Dicom data archived for session {experiment}, uploading CSV.")
-            
-            # Upload the the csv files to XNAT
-            with open(csv_radiomics, 'rb') as f:
+                logging.info("DICOM session not archived yet; waiting...")
+                time.sleep(5)
+
+            filename = os.path.basename(data_file)
+
+            if data_type == "csv":
+                upload_url = f"{check_url}/resources/csv/files/{filename}"
+                mime_type = "text/csv"
+            else:  # JSON data
+                upload_url = f"{check_url}/resources/json/files/{filename}"
+                mime_type = "application/json"
+
+            logging.info(f"Uploading {data_file} to XNAT resource")
+
+            # Perform upload
+            with open(data_file, "rb") as f:
                 response = requests.put(
                     upload_url,
                     data=f,
                     auth=self.auth,
-                    headers={'Content-Type': 'text/csv'}
+                    headers={'Content-Type': mime_type}
                 )
-                
-                if response.status_code in [200, 201]:
-                    logging.info(f"Uploaded {csv_radiomics} successfully.")
-                else:
-                    logging.info(f"Failed to upload {csv_radiomics}. Status: {response.status_code}, Error: {response.text}")
-                        
+
+            if response.status_code in [200, 201]:
+                logging.info(f"Uploaded {data_file} successfully.")
+            else:
+                logging.error(f"Failed to upload {data_file}. Status {response.status_code}: {response.text}")
+
         except Exception as e:
-            logging.error(f"An error occurred sending CSV files to XNAT: {e}", exc_info=True)
+            logging.error("An error occurred while uploading non-DICOM files.", exc_info=True)
+
             
     def send_next_queue(self, queue, data_folder):
         message_creator = messenger()
@@ -203,8 +235,8 @@ class SendDICOM:
                 self.adding_treatment_site(treatment_sites, data_folder)        
                 self.dicom_to_xnat(ports, data_folder)
                 logging.info(f"Send dicom file from: {data_folder} to XNAT")
-            elif ".csv" in data_types:
-                self.upload_csv_to_xnat(data_folder)
+            elif ".csv" in data_types or ".json" in data_types:
+                self.upload_non_dcm_to_xnat(data_folder)
                 logging.info(f"Send csv file from: {data_folder} to XNAT")
             
         except Exception as e:
