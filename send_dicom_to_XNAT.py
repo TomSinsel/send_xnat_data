@@ -9,7 +9,7 @@ from consumer import Consumer
 from config_handler import Config
 import json
 import zipfile
-from RabbitMQ_messenger import messenger
+
 
 logging.basicConfig(
     level=logging.INFO,
@@ -238,11 +238,6 @@ class SendDICOM:
         except Exception as e:
             logging.error("An error occurred while uploading non-DICOM files.", exc_info=True)
 
-            
-    def send_next_queue(self, queue, data_folder):
-        message_creator = messenger()
-        message_creator.create_message_next_queue(queue, data_folder)
-    
     
     def run(self, ch, method, properties, body, executor):
         treatment_sites = {"Tom": "LUNG", "Tim": "KIDNEY"}
@@ -280,10 +275,6 @@ class SendDICOM:
                 
             except Exception as e:
                 logging.error(f"An error occurred in the run method: {e}", exc_info=True)
-
-            # Send a message to the next queue.
-            if Config("xnat")["send_queue"] != None:
-                self.send_next_queue(Config("xnat")["send_queue"], data_folder)
         
 if __name__ == "__main__":
     # treatment_sites = {"PYTIM05": "LUNG", "Tim": "KIDNEY"}
