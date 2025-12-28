@@ -27,7 +27,37 @@ class SendDICOM:
         username = "admin"
         password = "admin"
         self.auth = HTTPBasicAuth(username, password)
+        
+    def check_for_subfolders(self, folder_path: str):
+        """ Checks whether a folder contains subfolders. If so, return a list of paths of the subfolders."""
+        
+        entries = os.listdir(folder_path)
+        if not entries:
+            raise ValueError(f"Folder is empty: {folder_path}")
 
+        has_files = False
+        subfolders = []
+
+        for entry in entries:
+            full_path = os.path.join(folder_path, entry)
+            if os.path.isfile(full_path):
+                has_files = True
+            elif os.path.isdir(full_path):
+                subfolders.append(full_path)
+
+        if has_files and subfolders:
+            raise ValueError(
+                f"Folder contains both files and subfolders: {folder_path}"
+            )
+            
+        # Case 1: files exist, treat main folder as single dataset
+        if has_files:
+            return [folder_path]
+
+        # Case 2: only subfolders exist
+        if subfolders:
+            return subfolders
+    
     def checking_connectivity(self):
         """Ckecks the connection to xnat"""
         logging.info("Checking connectivity")
@@ -233,24 +263,27 @@ class SendDICOM:
         logging.info("Connecting to XNAT works")         
         
         message_data = json.loads(body.decode("utf-8"))
-        data_folder = message_data.get('folder_path')
+        data_main_folder = message_data.get('folder_path')
         
-        try:
-            data_types = self.check_data_types(data_folder)
-            if ".dcm" in data_types:
-                self.adding_treatment_site(treatment_sites, data_folder)        
-                self.dicom_to_xnat(ports, data_folder)
-                logging.info(f"Send dicom file from: {data_folder} to XNAT")
-            elif ".csv" in data_types or ".json" in data_types:
-                self.upload_non_dcm_to_xnat(data_folder)
-                logging.info(f"Send non dcm file from: {data_folder} to XNAT")
-            
-        except Exception as e:
-            logging.error(f"An error occurred in the run method: {e}", exc_info=True)
+        data_folders = self.check_for_subfolders(data_main_folder)
+        
+        for data_folder in data_folders:
+            try:
+                data_types = self.check_data_types(data_folder)
+                if ".dcm" in data_types:
+                    self.adding_treatment_site(treatment_sites, data_folder)        
+                    self.dicom_to_xnat(ports, data_folder)
+                    logging.info(f"Send dicom file from: {data_folder} to XNAT")
+                elif ".csv" in data_types or ".json" in data_types:
+                    self.upload_non_dcm_to_xnat(data_folder)
+                    logging.info(f"Send non dcm file from: {data_folder} to XNAT")
+                
+            except Exception as e:
+                logging.error(f"An error occurred in the run method: {e}", exc_info=True)
 
-        # Send a message to the next queue.
-        if Config("xnat")["send_queue"] != None:
-            self.send_next_queue(Config("xnat")["send_queue"], data_folder)
+            # Send a message to the next queue.
+            if Config("xnat")["send_queue"] != None:
+                self.send_next_queue(Config("xnat")["send_queue"], data_folder)
         
 if __name__ == "__main__":
     # treatment_sites = {"PYTIM05": "LUNG", "Tim": "KIDNEY"}
